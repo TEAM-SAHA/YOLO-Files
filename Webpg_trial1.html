@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Snake Robot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{
+    text-align:center;
+    font-family:Arial;
+}
+
+button{
+    width:120px;
+    height:60px;
+    font-size:20px;
+    margin:10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Snake Robot Control</h1>
+
+<button onclick="sendCmd('F')">FORWARD</button>
+
+<br>
+
+<button onclick="sendCmd('L')">LEFT</button>
+
+<button onclick="sendCmd('S')">STOP</button>
+
+<button onclick="sendCmd('R')">RIGHT</button>
+
+<script>
+function sendCmd(cmd){
+    fetch('/cmd?value='+cmd);
+}
+</script>
+
+</body>
+</html>

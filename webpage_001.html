@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SNAKEBOT CONTROL STATION</title>
+  <style>
+    /* ============================================================
+       DESIGN TOKENS & RESET
+    ============================================================ */
+    :root {
+      --bg-base:        #030b12;
+      --bg-panel:       rgba(6, 20, 35, 0.72);
+      --bg-card:        rgba(8, 28, 50, 0.60);
+      --border:         rgba(0, 200, 255, 0.18);
+      --border-glow:    rgba(0, 200, 255, 0.55);
+
+      --neon:           #00c8ff;
+      --neon-dim:       rgba(0, 200, 255, 0.12);
+      --neon-glow:      0 0 14px rgba(0, 200, 255, 0.55),
+                        0 0 40px rgba(0, 200, 255, 0.18);
+
+      --blue:           #1166ff;
+      --blue-glow:      0 0 14px rgba(17, 102, 255, 0.70);
+      --cyan:           #00e5d4;
+      --cyan-glow:      0 0 14px rgba(0, 229, 212, 0.70);
+      --red:            #ff1f3d;
+      --red-glow:       0 0 14px rgba(255, 31, 61, 0.70);
+      --red-pulse:      rgba(255, 31, 61, 0.30);
+      --green:          #00e676;
+      --yellow:         #ffd740;
+
+      --text-primary:   #e8f4ff;
+      --text-secondary: rgba(180, 220, 255, 0.58);
+      --text-mono:      'Courier New', monospace;
+
+      --radius:         12px;
+      --radius-lg:      18px;
+      --panel-blur:     blur(18px);
+
+      --font-ui:        'Segoe UI', system-ui, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 15px; }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* animated starfield background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(0,80,160,0.14) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 90%, rgba(0,30,80,0.18) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ============================================================
+       UTILITY CLASSES
+    ============================================================ */
+    .glass {
+      background: var(--bg-panel);
+      backdrop-filter: var(--panel-blur);
+      -webkit-backdrop-filter: var(--panel-blur);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+
+    .label {
+      font-size: 0.68rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+
+    .value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--neon);
+    }
+
+    .section-title {
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--neon);
+      font-weight: 700;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px; height: 14px;
+      background: var(--neon);
+      border-radius: 2px;
+      box-shadow: var(--neon-glow);
+    }
+
+    /* ============================================================
+       LAYOUT WRAPPER
+    ============================================================ */
+    .page {
+      position: relative; z-index: 1;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 0 16px 40px;
+    }
+
+    /* ============================================================
+       TOP HEADER
+    ============================================================ */
+    .header {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 24px;
+      margin: 12px 0 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* Snake SVG logo */
+    .snake-logo {
+      width: 52px; height: 52px;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 10px var(--neon));
+      animation: logoFloat 3.6s ease-in-out infinite;
+    }
+    @keyframes logoFloat {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-5px); }
+    }
+
+    .brand-text h1 {
+      font-size: 1.45rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      background: linear-gradient(90deg, #fff 0%, var(--neon) 60%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+    }
+    .brand-text p {
+      font-size: 0.68rem;
+      letter-spacing: 0.22em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+
+    /* Header widgets */
+    .header-widgets {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .widget {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      min-width: 80px;
+    }
+
+    /* Connection status */
+    .conn-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: border-color .25s;
+    }
+    .conn-pill:hover { border-color: var(--neon); }
+    .conn-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: blink 1.8s ease-in-out infinite;
+    }
+    .conn-dot.disconnected {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+      animation: none;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .conn-text { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; }
+
+    /* Battery bar */
+    .battery-bar {
+      width: 54px; height: 10px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      overflow: hidden;
+      position: relative;
+    }
+    .battery-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--green), #00e676aa);
+      transition: width .6s ease;
+    }
+
+    /* Signal bars */
+    .signal-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 16px;
+    }
+    .signal-bars span {
+      width: 5px;
+      background: var(--neon);
+      border-radius: 2px 2px 0 0;
+      opacity: 0.25;
+      transition: opacity .3s;
+    }
+    .signal-bars span.active { opacity: 1; }
+    .signal-bars span:nth-child(1) { height: 5px; }
+    .signal-bars span:nth-child(2) { height: 8px; }
+    .signal-bars span:nth-child(3) { height: 11px; }
+    .signal-bars span:nth-child(4) { height: 16px; }
+
+    /* ============================================================
+       MAIN GRID
+    ============================================================ */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      grid-template-rows: auto auto auto;
+      gap: 16px;
+    }
+
+    /* ============================================================
+       CAMERA FEED (center, spans rows 1-2)
+    ============================================================ */
+    .camera-panel {
+      grid-column: 2;
+      grid-row: 1 / 3;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .camera-viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/10;
+      background: #000c18;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1.5px solid var(--border-glow);
+      box-shadow: var(--neon-glow), inset 0 0 60px rgba(0,0,0,0.6);
+    }
+
+    /* Corner scan lines */
+    .camera-viewport::before {
+      content: '';
+      position: absolute; inset: 0; z-index: 2;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 3px,
+          rgba(0,200,255,0.025) 3px,
+          rgba(0,200,255,0.025) 4px
+        );
+      pointer-events: none;
+    }
+
+    /* Moving scan line */
+    .scan-line {
+      position: absolute; left: 0; right: 0; z-index: 3;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--neon), transparent);
+      opacity: 0.55;
+      animation: scanMove 4s linear infinite;
+    }
+    @keyframes scanMove {
+      0%   { top: 0; opacity: .55; }
+      90%  { top: 100%; opacity: .55; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    .camera-placeholder {
+      position: absolute; inset: 0; z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .camera-placeholder svg { opacity: 0.22; }
+    .camera-placeholder p {
+      font-size: 0.72rem;
+      letter-spacing: 0.18em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    /* HUD overlays */
+    .hud-corner {
+      position: absolute; z-index: 4;
+      width: 26px; height: 26px;
+      border-color: var(--neon);
+      border-style: solid;
+      opacity: 0.7;
+    }
+    .hud-corner.tl { top: 10px; left: 10px; border-width: 2px 0 0 2px; }
+    .hud-corner.tr { top: 10px; right: 10px; border-width: 2px 2px 0 0; }
+    .hud-corner.bl { bottom: 10px; left: 10px; border-width: 0 0 2px 2px; }
+    .hud-corner.br { bottom: 10px; right: 10px; border-width: 0 2px 2px 0; }
+
+    .hud-tag {
+      position: absolute; z-index: 5;
+      font-family: var(--text-mono);
+      font-size: 0.62rem;
+      color: var(--neon);
+      letter-spacing: 0.08em;
+      opacity: 0.75;
+    }
+    .hud-tag.tl { top: 14px; left: 44px; }
+    .hud-tag.tr { top: 14px; right: 44px; }
+    .hud-tag.bl { bottom: 14px; left: 44px; }
+    .hud-tag.br { bottom: 14px; right: 44px; }
+
+    /* Detection box */
+    .detect-box {
+      position: absolute; z-index: 6;
+      border: 1.5px solid var(--yellow);
+      box-shadow: 0 0 8px rgba(255,215,64,0.4);
+      border-radius: 4px;
+      width: 140px; height: 90px;
+      top: 38%; left: 42%;
+      display: none;
+      animation: boxPulse 1.2s ease-in-out infinite;
+    }
+    .detect-box.active { display: block; }
+    .detect-box::after {
+      content: 'CRACK';
+      position: absolute; top: -18px; left: 0;
+      font-size: 0.58rem;
+      color: var(--yellow);
+      letter-spacing: 0.12em;
+      background: rgba(255,215,64,0.15);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+    @keyframes boxPulse {
+      0%,100%{ opacity:1 } 50%{ opacity:0.55 }
+    }
+
+    .camera-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .camera-meta .meta-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.68rem;
+      color: var(--text-secondary);
+      letter-spacing: 0.05em;
+    }
+    .meta-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .live-dot { background: var(--red); box-shadow: 0 0 6px var(--red); animation: blink .9s infinite; }
+
+    /* ============================================================
+       MOVEMENT CONTROL PANEL  (left column, row 1)
+    ============================================================ */
+    .ctrl-panel {
+      grid-column: 1;
+      grid-row: 1;
+      padding: 20px;
+    }
+
+    .dpad {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .dpad-btn {
+      aspect-ratio: 1;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.62rem;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: transform .1s, box-shadow .15s, filter .15s;
+      position: relative;
+      overflow: hidden;
+      outline: none;
+    }
+
+    .dpad-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(255,255,255,0.06);
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .dpad-btn:hover::before { opacity: 1; }
+    .dpad-btn:active { transform: scale(0.92); }
+
+    .btn-fwd  { background: linear-gradient(145deg, #0d4ccc, var(--blue)); box-shadow: var(--blue-glow); }
+    .btn-fwd:hover  { box-shadow: 0 0 22px rgba(17,102,255,0.85); filter: brightness(1.2); }
+
+    .btn-left, .btn-right {
+      background: linear-gradient(145deg, #007a70, var(--cyan));
+      box-shadow: var(--cyan-glow);
+    }
+    .btn-left:hover, .btn-right:hover { box-shadow: 0 0 22px rgba(0,229,212,0.85); filter: brightness(1.2); }
+
+    .btn-stop  { background: linear-gradient(145deg, #a00020, var(--red)); box-shadow: var(--red-glow); grid-column: 2; }
+    .btn-stop:hover  { box-shadow: 0 0 22px rgba(255,31,61,0.85); filter: brightness(1.2); }
+
+    .btn-back { background: linear-gradient(145deg, #1a3366, #224499); box-shadow: 0 0 12px rgba(34,68,153,0.5); }
+    .btn-back:hover { filter: brightness(1.2); }
+
+    .dpad-btn svg { pointer-events: none; }
+    .btn-empty { visibility: hidden; }
+
+    /* ============================================================
+       ROBOT STATUS PANEL  (right column, row 1)
+    ============================================================ */
+    .status-panel {
+      grid-column: 3;
+      grid-row: 1;
+      padding: 20px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .status-card {
+      background: var(--neon-dim);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 11px 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .status-card .sc-val {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--neon);
+      font-variant-numeric: tabular-nums;
+    }
+    .status-card .sc-val.warn { color: var(--yellow); }
+    .status-card .sc-val.ok   { color: var(--green); }
+
+    /* ============================================================
+       MOTION CONTROLS  (left column, row 2)
+    ============================================================ */
+    .motion-panel {
+      grid-column: 1;
+      grid-row: 2;
+      padding: 20px;
+    }
+
+    .slider-row {
+      margin-bottom: 16px;
+    }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 8px;
+    }
+    .slider-val {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--neon);
+      font-variant-numeric: tabular-nums;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.08);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--neon);
+      box-shadow: 0 0 10px var(--neon), 0 0 4px #fff;
+      cursor: pointer;
+      transition: transform .15s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.25); }
+    input[type=range]::-moz-range-thumb {
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--neon);
+      box-shadow: 0 0 10px var(--neon);
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ============================================================
+       CRACK DETECTION  (right column, row 2)
+    ============================================================ */
+    .crack-panel {
+      grid-column: 3;
+      grid-row: 2;
+      padding: 20px;
+    }
+
+    .crack-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .crack-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      transition: border-color .3s;
+    }
+    .crack-card.alert { border-color: var(--yellow); box-shadow: 0 0 12px rgba(255,215,64,0.2); }
+    .crack-card .cc-val {
+      font-size: 1.15rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+    .crack-card .cc-val.ok     { color: var(--green); }
+    .crack-card .cc-val.warn   { color: var(--yellow); }
+    .crack-card .cc-val.info   { color: var(--neon); }
+    .crack-card .cc-val.danger { color: var(--red); }
+
+    /* Confidence bar */
+    .conf-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .conf-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--yellow), #ffb300);
+      transition: width .6s ease;
+    }
+
+    /* ============================================================
+       ACTIVITY LOG  (full width, row 3)
+    ============================================================ */
+    .log-panel {
+      grid-column: 1 / -1;
+      grid-row: 3;
+      padding: 20px;
+    }
+
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .log-clear-btn {
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      color: var(--text-secondary);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: border-color .2s, color .2s;
+    }
+    .log-clear-btn:hover { border-color: var(--neon); color: var(--neon); }
+
+    .log-console {
+      height: 160px;
+      overflow-y: auto;
+      font-family: var(--text-mono);
+      font-size: 0.75rem;
+      line-height: 1.7;
+      padding: 12px;
+      background: rgba(0,0,0,0.35);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    .log-entry {
+      animation: logIn .25s ease;
+    }
+    @keyframes logIn { from { opacity:0; transform: translateX(-6px); } to { opacity:1; transform:none; } }
+
+    .log-time { color: var(--text-secondary); margin-right: 6px; }
+    .log-text  { color: var(--text-primary); }
+    .log-entry.crack .log-text { color: var(--yellow); }
+    .log-entry.stop  .log-text { color: var(--red); }
+    .log-entry.ok    .log-text { color: var(--green); }
+    .log-entry.info  .log-text { color: var(--neon); }
+
+    /* ============================================================
+       EMERGENCY STOP
+    ============================================================ */
+    .estop-section {
+      grid-column: 1 / -1;
+      grid-row: 4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 20px 0 10px;
+    }
+
+    .estop-btn {
+      width: 180px; height: 70px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #8b0010, var(--red));
+      color: #fff;
+      font-size: 1.05rem;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--red-glow), 0 0 40px rgba(255,31,61,0.3);
+      transition: transform .1s, filter .15s;
+      animation: estopPulse 2.2s ease-in-out infinite;
+    }
+    .estop-btn::before {
+      content: '';
+      position: absolute; inset: -4px;
+      border-radius: 15px;
+      background: var(--red-pulse);
+      animation: estopRing 2.2s ease-in-out infinite;
+      z-index: -1;
+    }
+    @keyframes estopPulse {
+      0%,100% { box-shadow: var(--red-glow), 0 0 30px rgba(255,31,61,0.3); }
+      50%      { box-shadow: var(--red-glow), 0 0 60px rgba(255,31,61,0.55); }
+    }
+    @keyframes estopRing {
+      0%    { transform: scale(1); opacity: .5; }
+      70%   { transform: scale(1.08); opacity: .18; }
+      100%  { transform: scale(1); opacity: .5; }
+    }
+    .estop-btn:hover  { filter: brightness(1.2); }
+    .estop-btn:active { transform: scale(0.95); }
+
+    .estop-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.15em;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+    }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media (max-width: 1100px) {
+      .main-grid {
+        grid-template-columns: 240px 1fr 240px;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .main-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+      }
+      .camera-panel { grid-column: 1 / -1; grid-row: 1; }
+      .ctrl-panel   { grid-column: 1; grid-row: 2; }
+      .status-panel { grid-column: 2; grid-row: 2; }
+      .motion-panel { grid-column: 1; grid-row: 3; }
+      .crack-panel  { grid-column: 2; grid-row: 3; }
+      .log-panel    { grid-column: 1 / -1; grid-row: 4; }
+      .estop-section { grid-column: 1 / -1; grid-row: 5; }
+    }
+
+    @media (max-width: 580px) {
+      .main-grid { grid-template-columns: 1fr; }
+      .camera-panel  { grid-column: 1; }
+      .ctrl-panel    { grid-column: 1; grid-row: 2; }
+      .status-panel  { grid-column: 1; grid-row: 3; }
+      .motion-panel  { grid-column: 1; grid-row: 4; }
+      .crack-panel   { grid-column: 1; grid-row: 5; }
+      .log-panel     { grid-column: 1; grid-row: 6; }
+      .estop-section { grid-column: 1; grid-row: 7; }
+
+      .header { grid-template-columns: 1fr; gap: 12px; padding: 14px 12px; }
+      .header-widgets { justify-content: flex-start; }
+      .brand-text h1 { font-size: 1.1rem; }
+
+      .status-grid { grid-template-columns: 1fr 1fr; }
+      .crack-grid  { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; }
+    }
+
+    /* ============================================================
+       TOAST
+    ============================================================ */
+    .toast {
+      position: fixed;
+      bottom: 30px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(0,0,0,0.88);
+      border: 1px solid var(--border-glow);
+      border-radius: 50px;
+      padding: 10px 24px;
+      font-size: 0.78rem;
+      letter-spacing: 0.08em;
+      color: var(--neon);
+      opacity: 0;
+      transition: opacity .25s, transform .25s;
+      z-index: 1000;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ============================================================
+       HEADER
+  ============================================================ -->
+  <header class="header glass">
+    <div class="header-brand">
+      <!-- Snake Robot SVG Logo -->
+      <svg class="snake-logo" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <!-- Body segments -->
+        <g filter="url(#glow)">
+          <rect x="4" y="26" width="10" height="8" rx="4" fill="#00c8ff" opacity="0.9"/>
+          <rect x="16" y="23" width="10" height="8" rx="4" fill="#00c8ff" opacity="0.85"/>
+          <rect x="28" y="26" width="10" height="8" rx="4" fill="#00c8ff" opacity="0.8"/>
+          <rect x="36" y="18" width="10" height="8" rx="4" fill="#00c8ff" opacity="0.9"/>
+          <!-- Head -->
+          <ellipse cx="34" cy="14" rx="7" ry="5" fill="#00e5ff"/>
+          <!-- Eyes -->
+          <circle cx="32" cy="12.5" r="1.5" fill="#fff"/>
+          <circle cx="32.5" cy="12.5" r="0.7" fill="#030b12"/>
+          <!-- Tongue -->
+          <path d="M40 14 L44 12 M44 12 L46 10 M44 12 L46 14" stroke="#ff1f3d" stroke-width="1.2" stroke-linecap="round"/>
+          <!-- Camera/sensor on head -->
+          <circle cx="36" cy="14" r="2" fill="rgba(0,0,0,0.6)" stroke="#00c8ff" stroke-width="1"/>
+          <circle cx="36" cy="14" r="1" fill="#ff1f3d" opacity="0.85"/>
+          <!-- Joints -->
+          <circle cx="14" cy="30" r="2" fill="#00e5d4"/>
+          <circle cx="26" cy="27" r="2" fill="#00e5d4"/>
+          <circle cx="38" cy="30" r="2" fill="#00e5d4"/>
+          <!-- Wheels/tracks -->
+          <rect x="5" y="33" width="8" height="3" rx="1.5" fill="rgba(0,200,255,0.5)"/>
+          <rect x="17" y="30" width="8" height="3" rx="1.5" fill="rgba(0,200,255,0.5)"/>
+          <rect x="29" y="33" width="8" height="3" rx="1.5" fill="rgba(0,200,255,0.5)"/>
+        </g>
+      </svg>
+      <div class="brand-text">
+        <h1>SNAKEBOT</h1>
+        <p>Control Station · SBCS v2.4.1</p>
+      </div>
+    </div>
+
+    <div></div><!-- spacer -->
+
+    <div class="header-widgets">
+      <!-- Connection Status -->
+      <div class="conn-pill" id="connPill" onclick="toggleConnection()">
+        <div class="conn-dot" id="connDot"></div>
+        <span class="conn-text" id="connText">CONNECTED</span>
+      </div>
+
+      <!-- Battery -->
+      <div class="widget">
+        <span class="label">Battery</span>
+        <div class="battery-bar">
+          <div class="battery-fill" id="battFill" style="width:78%"></div>
+        </div>
+        <span class="label" id="battVal" style="color:var(--green);margin-top:2px">78%</span>
+      </div>
+
+      <!-- Signal -->
+      <div class="widget">
+        <span class="label">Signal</span>
+        <div class="signal-bars" id="signalBars">
+          <span class="active"></span>
+          <span class="active"></span>
+          <span class="active"></span>
+          <span></span>
+        </div>
+        <span class="label" id="sigLabel" style="color:var(--neon);margin-top:2px">-62 dBm</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       MAIN GRID
+  ============================================================ -->
+  <div class="main-grid">
+
+    <!-- ── MOVEMENT CONTROL PANEL ── -->
+    <section class="ctrl-panel glass">
+      <div class="section-title">Movement</div>
+      <div class="dpad">
+        <div class="btn-empty"></div>
+        <button class="dpad-btn btn-fwd" onmousedown="sendCmd('FORWARD')" ontouchstart="sendCmd('FORWARD')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+          FWD
+        </button>
+        <div class="btn-empty"></div>
+
+        <button class="dpad-btn btn-left" onmousedown="sendCmd('LEFT')" ontouchstart="sendCmd('LEFT')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          LEFT
+        </button>
+        <button class="dpad-btn btn-stop" onmousedown="sendCmd('STOP')" ontouchstart="sendCmd('STOP')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2"/></svg>
+          STOP
+        </button>
+        <button class="dpad-btn btn-right" onmousedown="sendCmd('RIGHT')" ontouchstart="sendCmd('RIGHT')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          RIGHT
+        </button>
+
+        <div class="btn-empty"></div>
+        <button class="dpad-btn btn-back" onmousedown="sendCmd('BACK')" ontouchstart="sendCmd('BACK')">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          BACK
+        </button>
+        <div class="btn-empty"></div>
+      </div>
+    </section>
+
+    <!-- ── LIVE CAMERA FEED ── -->
+    <section class="camera-panel glass">
+      <div class="section-title">Live Feed · ESP32-CAM</div>
+      <div class="camera-viewport">
+        <div class="scan-line"></div>
+        <div class="hud-corner tl"></div>
+        <div class="hud-corner tr"></div>
+        <div class="hud-corner bl"></div>
+        <div class="hud-corner br"></div>
+        <span class="hud-tag tl" id="hudFPS">FPS: 24</span>
+        <span class="hud-tag tr">CH.01 · RGB</span>
+        <span class="hud-tag bl" id="hudTime">00:00:00</span>
+        <span class="hud-tag br" id="hudRes">640×480</span>
+        <div class="detect-box" id="detectBox"></div>
+        <div class="camera-placeholder" id="camPlaceholder">
+          <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#00c8ff" stroke-width="1.2">
+            <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+          </svg>
+          <p>Awaiting Camera Stream</p>
+          <p style="font-size:.58rem;opacity:.5">ESP32-CAM · 192.168.1.100:81</p>
+        </div>
+      </div>
+      <div class="camera-meta">
+        <div class="meta-chip">
+          <div class="meta-dot live-dot"></div>
+          <span>LIVE</span>
+        </div>
+        <div class="meta-chip">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          <span id="uptime">UPTIME&nbsp;04:22:07</span>
+        </div>
+        <div class="meta-chip">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>LATENCY&nbsp;<span id="latency">28ms</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ROBOT STATUS ── -->
+    <section class="status-panel glass">
+      <div class="section-title">System Status</div>
+      <div class="status-grid">
+        <div class="status-card">
+          <span class="label">Mode</span>
+          <span class="sc-val info" id="sMode">WAVE</span>
+        </div>
+        <div class="status-card">
+          <span class="label">Wave Speed</span>
+          <span class="sc-val" id="sSpeed">1.20 Hz</span>
+        </div>
+        <div class="status-card">
+          <span class="label">Servos</span>
+          <span class="sc-val ok" id="sServos">8 / 8</span>
+        </div>
+        <div class="status-card">
+          <span class="label">FPS</span>
+          <span class="sc-val" id="sFPS">24 fps</span>
+        </div>
+        <div class="status-card" style="grid-column:1/-1">
+          <span class="label">Detection</span>
+          <span class="sc-val warn" id="sDetect">SCANNING</span>
+        </div>
+        <div class="status-card">
+          <span class="label">CPU Temp</span>
+          <span class="sc-val" id="sTemp">47 °C</span>
+        </div>
+        <div class="status-card">
+          <span class="label">Uptime</span>
+          <span class="sc-val" id="sUptime">04:22:07</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── MOTION CONTROLS ── -->
+    <section class="motion-panel glass">
+      <div class="section-title">Motion Parameters</div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="label">Wave Amplitude</span>
+          <span class="slider-val" id="ampVal">35°</span>
+        </div>
+        <input type="range" min="5" max="90" value="35" oninput="updateSlider('amp', this.value, '°')" id="ampSlider">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="label">Wave Speed</span>
+          <span class="slider-val" id="speedVal">1.20 Hz</span>
+        </div>
+        <input type="range" min="10" max="400" value="120" oninput="updateSlider('speed', this.value / 100, ' Hz')" id="speedSlider">
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-header">
+          <span class="label">Brightness</span>
+          <span class="slider-val" id="brightVal">70%</span>
+        </div>
+        <input type="range" min="0" max="100" value="70" oninput="updateSlider('bright', this.value, '%')" id="brightSlider">
+      </div>
+    </section>
+
+    <!-- ── CRACK DETECTION ── -->
+    <section class="crack-panel glass">
+      <div class="section-title">Crack Detection</div>
+      <div class="crack-grid">
+        <div class="crack-card" id="detStatusCard">
+          <span class="label">Status</span>
+          <span class="cc-val ok" id="detStatus">CLEAR</span>
+        </div>
+        <div class="crack-card">
+          <span class="label">Confidence</span>
+          <span class="cc-val warn" id="detConf">87.4%</span>
+          <div class="conf-bar"><div class="conf-fill" id="confFill" style="width:87.4%"></div></div>
+        </div>
+        <div class="crack-card">
+          <span class="label">Last Detect</span>
+          <span class="cc-val info" id="lastDetect">21:03:15</span>
+        </div>
+        <div class="crack-card">
+          <span class="label">Crack Count</span>
+          <span class="cc-val danger" id="crackCount">3</span>
+        </div>
+        <div class="crack-card" style="grid-column:1/-1">
+          <span class="label">AI Model</span>
+          <span class="cc-val info" style="font-size:.85rem">YOLOv5s · ONNX</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── ACTIVITY LOG ── -->
+    <section class="log-panel glass">
+      <div class="log-header">
+        <div class="section-title" style="margin-bottom:0">Activity Log</div>
+        <button class="log-clear-btn" onclick="clearLog()">Clear</button>
+      </div>
+      <div class="log-console" id="logConsole"></div>
+    </section>
+
+    <!-- ── EMERGENCY STOP ── -->
+    <div class="estop-section">
+      <button class="estop-btn" onclick="emergencyStop()">⬡ E-STOP</button>
+      <span class="estop-label">Emergency Halt · All Motors</span>
+    </div>
+
+  </div><!-- /main-grid -->
+</div><!-- /page -->
+
+<div class="toast" id="toast"></div>
+
+<!-- ============================================================
+     JAVASCRIPT
+============================================================ -->
+<script>
+  /* ── State ── */
+  const state = {
+    connected: true,
+    battPct:   78,
+    signalBars:3,
+    crackCount:3,
+    uptime:    15727, // seconds
+    fps:       24,
+    detecting: false,
+  };
+
+  /* ── Helpers ── */
+  function pad(n){ return String(n).padStart(2,'0'); }
+
+  function nowStr(){
+    const d=new Date();
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function fmtUptime(s){
+    const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+    return `${pad(h)}:${pad(m)}:${pad(sec)}`;
+  }
+
+  /* ── Toast ── */
+  let toastTimer;
+  function showToast(msg){
+    const t=document.getElementById('toast');
+    t.textContent=msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+  }
+
+  /* ── Log ── */
+  const logTypes = {
+    'FORWARD':  { cls:'info',  text:'Forward command sent' },
+    'BACK':     { cls:'info',  text:'Backward command sent' },
+    'LEFT':     { cls:'info',  text:'Left turn command sent' },
+    'RIGHT':    { cls:'info',  text:'Right turn command sent' },
+    'STOP':     { cls:'stop',  text:'Robot stopped' },
+    'CRACK':    { cls:'crack', text:'⚠ Crack detected — confidence 87.4%' },
+    'CLEAR':    { cls:'ok',    text:'✓ Area cleared — no cracks detected' },
+    'ESTOP':    { cls:'stop',  text:'🛑 EMERGENCY STOP activated' },
+    'CONNECT':  { cls:'ok',    text:'✓ Connection established' },
+    'DISCONN':  { cls:'stop',  text:'⚠ Connection lost' },
+    'BOOT':     { cls:'info',  text:'System boot complete — all modules online' },
+    'SERVO':    { cls:'info',  text:'Servo calibration OK (8/8)' },
+    'CAM':      { cls:'info',  text:'Camera stream initialized — 640×480 @ 24fps' },
+  };
+
+  function addLog(type, customText){
+    const console = document.getElementById('logConsole');
+    const entry   = logTypes[type] || { cls:'info', text: customText||type };
+    const div     = document.createElement('div');
+    div.className = `log-entry ${entry.cls}`;
+    div.innerHTML = `<span class="log-time">[${nowStr()}]</span><span class="log-text"> ${customText||entry.text}</span>`;
+    console.appendChild(div);
+    console.scrollTop = console.scrollHeight;
+    // keep max 120 lines
+    while(console.children.length > 120) console.removeChild(console.firstChild);
+  }
+
+  function clearLog(){
+    document.getElementById('logConsole').innerHTML='';
+    addLog('BOOT');
+    showToast('Log cleared');
+  }
+
+  /* ── Commands ── */
+  function sendCmd(cmd){
+    if(!state.connected){ showToast('Not connected'); return; }
+    addLog(cmd);
+    showToast(`${cmd} →`);
+    // Here you would: fetch(`http://192.168.1.100/${cmd.toLowerCase()}`).catch(console.warn);
+  }
+
+  /* ── Emergency Stop ── */
+  function emergencyStop(){
+    sendCmd('STOP');
+    addLog('ESTOP');
+    showToast('🛑 EMERGENCY STOP');
+    document.getElementById('sMode').textContent = 'HALTED';
+    document.getElementById('sMode').className  = 'sc-val warn';
+  }
+
+  /* ── Connection toggle (demo) ── */
+  function toggleConnection(){
+    state.connected = !state.connected;
+    const dot  = document.getElementById('connDot');
+    const txt  = document.getElementById('connText');
+    if(state.connected){
+      dot.classList.remove('disconnected');
+      txt.textContent = 'CONNECTED';
+      txt.style.color = 'var(--green)';
+      addLog('CONNECT');
+    } else {
+      dot.classList.add('disconnected');
+      txt.textContent = 'DISCONNECTED';
+      txt.style.color = 'var(--red)';
+      addLog('DISCONN');
+    }
+  }
+
+  /* ── Sliders ── */
+  function updateSlider(id, val, unit){
+    const map = { amp:'ampVal', speed:'speedVal', bright:'brightVal' };
+    const el  = document.getElementById(map[id]);
+    const disp= id==='speed' ? parseFloat(val).toFixed(2) : Math.round(val);
+    el.textContent = disp + unit;
+    if(id==='speed'){
+      document.getElementById('sSpeed').textContent  = parseFloat(val).toFixed(2)+' Hz';
+    }
+  }
+
+  /* ── Clock / HUD time ── */
+  function updateClock(){
+    const t=nowStr();
+    document.getElementById('hudTime').textContent = t;
+  }
+
+  /* ── Uptime ── */
+  function updateUptime(){
+    state.uptime++;
+    const s=fmtUptime(state.uptime);
+    document.getElementById('sUptime').textContent = s;
+    document.getElementById('uptime').textContent  = 'UPTIME\u00A0'+s;
+  }
+
+  /* ── Simulated telemetry ── */
+  let tickCount = 0;
+  function telemetryTick(){
+    tickCount++;
+
+    /* battery drift */
+    if(tickCount % 40 === 0 && state.battPct > 5){
+      state.battPct = Math.max(5, state.battPct - 0.5);
+      const pct = state.battPct;
+      document.getElementById('battFill').style.width = pct+'%';
+      document.getElementById('battVal').textContent  = Math.round(pct)+'%';
+      document.getElementById('battFill').style.background =
+        pct < 20 ? 'linear-gradient(90deg,var(--red),#ff6060aa)'
+        : pct < 40 ? 'linear-gradient(90deg,var(--yellow),#ffd740aa)'
+        : 'linear-gradient(90deg,var(--green),#00e676aa)';
+    }
+
+    /* FPS jitter */
+    const fps = 22 + Math.floor(Math.random()*5);
+    document.getElementById('hudFPS').textContent  = `FPS: ${fps}`;
+    document.getElementById('sFPS').textContent    = `${fps} fps`;
+
+    /* latency jitter */
+    const lat = 20 + Math.floor(Math.random()*30);
+    document.getElementById('latency').textContent = `${lat}ms`;
+
+    /* CPU temp drift */
+    const temp = 44 + Math.floor(Math.random()*8);
+    const tEl  = document.getElementById('sTemp');
+    tEl.textContent = `${temp} °C`;
+    tEl.className   = `sc-val ${temp > 55 ? 'warn' : ''}`;
+
+    /* signal drift */
+    if(tickCount % 25 === 0){
+      state.signalBars = Math.max(1, Math.min(4, state.signalBars + (Math.random()>.6 ? 1 : -1)));
+      const bars = document.querySelectorAll('#signalBars span');
+      bars.forEach((b,i)=> b.classList.toggle('active', i < state.signalBars));
+      const dbm = -45 - (4-state.signalBars)*15;
+      document.getElementById('sigLabel').textContent = `${dbm} dBm`;
+    }
+
+    /* simulate crack detection event roughly every 90s */
+    if(tickCount % 180 === 90 && state.connected){
+      triggerCrackDetection();
+    }
+    if(tickCount % 180 === 140 && state.connected){
+      clearCrackDetection();
+    }
+  }
+
+  function triggerCrackDetection(){
+    state.crackCount++;
+    state.detecting = true;
+    document.getElementById('detectBox').classList.add('active');
+    document.getElementById('detStatus').textContent = 'DETECTED';
+    document.getElementById('detStatus').className   = 'cc-val danger';
+    document.getElementById('detStatusCard').classList.add('alert');
+    document.getElementById('lastDetect').textContent = nowStr();
+    document.getElementById('crackCount').textContent = state.crackCount;
+    document.getElementById('sDetect').textContent = 'DETECTED';
+    document.getElementById('sDetect').className   = 'sc-val danger';
+    const conf = (82 + Math.random()*15).toFixed(1);
+    document.getElementById('detConf').textContent = conf+'%';
+    document.getElementById('confFill').style.width = conf+'%';
+    addLog('CRACK');
+  }
+
+  function clearCrackDetection(){
+    state.detecting = false;
+    document.getElementById('detectBox').classList.remove('active');
+    document.getElementById('detStatus').textContent = 'CLEAR';
+    document.getElementById('detStatus').className   = 'cc-val ok';
+    document.getElementById('detStatusCard').classList.remove('alert');
+    document.getElementById('sDetect').textContent = 'SCANNING';
+    document.getElementById('sDetect').className   = 'sc-val warn';
+    addLog('CLEAR');
+  }
+
+  /* ── Boot sequence ── */
+  function boot(){
+    addLog('BOOT');
+    setTimeout(()=>addLog('SERVO'), 600);
+    setTimeout(()=>addLog('CAM'),   1200);
+    setTimeout(()=>addLog('CONNECT'),1900);
+
+    // seed a few historical entries
+    setTimeout(()=>{
+      addLog('FORWARD');
+      setTimeout(()=>{ addLog('CRACK'); triggerCrackDetection(); }, 600);
+      setTimeout(()=>{ addLog('STOP'); clearCrackDetection(); }, 1200);
+    }, 2400);
+  }
+
+  /* ── Start ── */
+  boot();
+  setInterval(updateClock, 1000);
+  setInterval(updateUptime, 1000);
+  setInterval(telemetryTick, 500);
+</script>
+</body>
+</html>
